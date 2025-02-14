@@ -30,6 +30,7 @@ The full **Logic App definition** is available in [`logicapp-definition.json`](l
 ### **1️⃣ Deploy via Azure Portal**
 - Open **Azure Portal** → Navigate to **Logic Apps** → Create a new Logic App.
 - Go to **Code View** → Paste the contents of `logicapp-definition.json`.
+- Enter your own variables and parameters relavent to each trigger/action/switch statement.
 - Save & Test!
 
 ### **2️⃣ Deploy via Azure CLI**
