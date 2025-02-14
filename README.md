@@ -9,6 +9,10 @@ This Logic App automates the process of **onboarding a new employee** into an or
 - **Provisioning a dedicated Resource Group**
 - **Sending a Slack notification to the new hire instead of an email**
 
+## 📸 Screenshot of Logic App Workflow
+
+![image](https://github.com/user-attachments/assets/aa1c33e0-b4f6-4f6f-ae6c-a5af16f3c18e)
+
 ## 🛠 Technologies Used
 - **Azure Logic Apps**
 - **Microsoft Entra ID**
