@@ -1,0 +1,318 @@
+{
+    "definition": {
+        "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+        "contentVersion": "1.0.0.0",
+        "triggers": {
+            "When_a_HTTP_request_is_received": {
+                "type": "Request",
+                "kind": "Http",
+                "inputs": {
+                    "method": "POST",
+                    "schema": {
+                        "type": "object",
+                        "properties": {
+                            "accountEnabled": {
+                                "type": "boolean"
+                            },
+                            "displayName": {
+                                "type": "string"
+                            },
+                            "mailNickname": {
+                                "type": "string"
+                            },
+                            "userPrincipalName": {
+                                "type": "string"
+                            },
+                            "passwordProfile": {
+                                "type": "object",
+                                "properties": {
+                                    "forceChangePasswordNextSignIn": {
+                                        "type": "boolean"
+                                    },
+                                    "password": {
+                                        "type": "string"
+                                    }
+                                }
+                            },
+                            "jobTitle": {
+                                "type": "string"
+                            },
+                            "department": {
+                                "type": "string"
+                            },
+                            "managerEmail": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "actions": {
+            "Create_user": {
+                "runAfter": {},
+                "type": "ApiConnection",
+                "inputs": {
+                    "host": {
+                        "connection": {
+                            "name": "@parameters('$connections')['azuread']['connectionId']"
+                        }
+                    },
+                    "method": "post",
+                    "body": {
+                        "accountEnabled": true,
+                        "displayName": "@triggerBody()?['displayName']",
+                        "mailNickname": "@triggerBody()?['mailNickname']",
+                        "passwordProfile": {
+                            "password": "@triggerBody()?['passwordProfile']?['password']"
+                        },
+                        "userPrincipalName": "@triggerBody()?['userPrincipalName']",
+                        "department": "@triggerBody()?['department']",
+                        "jobTitle": "@triggerBody()?['jobTitle']"
+                    },
+                    "path": "/v1.0/users"
+                }
+            },
+            "Switch": {
+                "runAfter": {
+                    "Create_user": [
+                        "Succeeded"
+                    ]
+                },
+                "cases": {
+                    "Case": {
+                        "case": "Engineering",
+                        "actions": {
+                            "Add_user_to_Engineering_group": {
+                                "type": "ApiConnection",
+                                "inputs": {
+                                    "host": {
+                                        "connection": {
+                                            "name": "@parameters('$connections')['azuread']['connectionId']"
+                                        }
+                                    },
+                                    "method": "post",
+                                    "body": {
+                                        "@@odata.id": "@body('Create_user')?['id']"
+                                    },
+                                    "path": "/v1.0/groups/@{encodeURIComponent('{GROUP_OBJECT_ID}')}/members/$ref"
+                                }
+                            },
+                            "Create_or_update_a_resource_group": {
+                                "runAfter": {
+                                    "Add_user_to_Engineering_group": [
+                                        "Succeeded"
+                                    ]
+                                },
+                                "type": "ApiConnection",
+                                "inputs": {
+                                    "host": {
+                                        "connection": {
+                                            "name": "@parameters('$connections')['arm']['connectionId']"
+                                        }
+                                    },
+                                    "method": "put",
+                                    "body": {
+                                        "location": "uksouth"
+                                    },
+                                    "path": "/subscriptions/@{encodeURIComponent('{SUBSCRIPTION_ID}')}/resourcegroups/@{encodeURIComponent('rg-engineering-',triggerBody()?['mailNickname'])}",
+                                    "queries": {
+                                        "x-ms-api-version": "2016-06-01"
+                                    }
+                                }
+                            },
+                            "Post_message_(V2)": {
+                                "runAfter": {
+                                    "Create_or_update_a_resource_group": [
+                                        "Succeeded"
+                                    ]
+                                },
+                                "type": "ApiConnection",
+                                "inputs": {
+                                    "host": {
+                                        "connection": {
+                                            "name": "@parameters('$connections')['slack']['connectionId']"
+                                        }
+                                    },
+                                    "method": "post",
+                                    "body": {
+                                        "channel": "{SLACK_CHANNEL}",
+                                        "text": "Welcome @{triggerBody()?['displayName']}!"
+                                    },
+                                    "path": "/v2/chat.postMessage"
+                                }
+                            }
+                        }
+                    },
+                    "Case 2": {
+                        "case": "IT",
+                        "actions": {
+                            "Add_user_to_IT_group": {
+                                "type": "ApiConnection",
+                                "inputs": {
+                                    "host": {
+                                        "connection": {
+                                            "name": "@parameters('$connections')['azuread']['connectionId']"
+                                        }
+                                    },
+                                    "method": "post",
+                                    "body": {
+                                        "@@odata.id": "@body('Create_user')?['id']"
+                                    },
+                                    "path": "/v1.0/groups/@{encodeURIComponent('{GROUP_OBJECT_ID}')}/members/$ref"
+                                }
+                            },
+                            "Create_or_update_a_resource_group_2": {
+                                "runAfter": {
+                                    "Add_user_to_IT_group": [
+                                        "Succeeded"
+                                    ]
+                                },
+                                "type": "ApiConnection",
+                                "inputs": {
+                                    "host": {
+                                        "connection": {
+                                            "name": "@parameters('$connections')['arm']['connectionId']"
+                                        }
+                                    },
+                                    "method": "put",
+                                    "body": {
+                                        "location": "uksouth"
+                                    },
+                                    "path": "/subscriptions/@{encodeURIComponent('{SUBSCRIPTION_ID}')}/resourcegroups/@{encodeURIComponent('rg-it-',triggerBody()?['mailNickname'])}",
+                                    "queries": {
+                                        "x-ms-api-version": "2016-06-01"
+                                    }
+                                }
+                            },
+                            "Post_message_(V2)-copy": {
+                                "runAfter": {
+                                    "Create_or_update_a_resource_group_2": [
+                                        "Succeeded"
+                                    ]
+                                },
+                                "type": "ApiConnection",
+                                "inputs": {
+                                    "host": {
+                                        "connection": {
+                                            "name": "@parameters('$connections')['slack']['connectionId']"
+                                        }
+                                    },
+                                    "method": "post",
+                                    "body": {
+                                        "channel": "{SLACK_CHANNEL}",
+                                        "text": "Welcome @{triggerBody()?['displayName']}!"
+                                    },
+                                    "path": "/v2/chat.postMessage"
+                                }
+                            }
+                        }
+                    },
+                    "Case 3": {
+                        "case": "HR",
+                        "actions": {
+                            "Add_user_to_HR_group": {
+                                "type": "ApiConnection",
+                                "inputs": {
+                                    "host": {
+                                        "connection": {
+                                            "name": "@parameters('$connections')['azuread']['connectionId']"
+                                        }
+                                    },
+                                    "method": "post",
+                                    "body": {
+                                        "@@odata.id": "@body('Create_user')?['id']"
+                                    },
+                                    "path": "/v1.0/groups/@{encodeURIComponent('{GROUP_OBJECT_ID}')}/members/$ref"
+                                }
+                            },
+                            "Create_or_update_a_resource_group_3": {
+                                "runAfter": {
+                                    "Add_user_to_HR_group": [
+                                        "Succeeded"
+                                    ]
+                                },
+                                "type": "ApiConnection",
+                                "inputs": {
+                                    "host": {
+                                        "connection": {
+                                            "name": "@parameters('$connections')['arm']['connectionId']"
+                                        }
+                                    },
+                                    "method": "put",
+                                    "body": {
+                                        "location": "uksouth"
+                                    },
+                                    "path": "/subscriptions/@{encodeURIComponent('{SUBSCRIPTION_ID}')}/resourcegroups/@{encodeURIComponent('rg-hr-',triggerBody()?['mailNickname'])}",
+                                    "queries": {
+                                        "x-ms-api-version": "2016-06-01"
+                                    }
+                                }
+                            },
+                            "Post_message_(V2)-copy_1": {
+                                "runAfter": {
+                                    "Create_or_update_a_resource_group_3": [
+                                        "Succeeded"
+                                    ]
+                                },
+                                "type": "ApiConnection",
+                                "inputs": {
+                                    "host": {
+                                        "connection": {
+                                            "name": "@parameters('$connections')['slack']['connectionId']"
+                                        }
+                                    },
+                                    "method": "post",
+                                    "body": {
+                                        "channel": "{SLACK_CHANNEL}",
+                                        "text": "Welcome @{triggerBody()?['displayName']}!"
+                                    },
+                                    "path": "/v2/chat.postMessage"
+                                }
+                            }
+                        }
+                    }
+                },
+                "default": {
+                    "actions": {
+                        "Compose": {
+                            "type": "Compose",
+                            "inputs": "Unknown department: @{triggerBody()?['department']}\n"
+                        }
+                    }
+                },
+                "expression": "@triggerBody()?['department']",
+                "type": "Switch"
+            }
+        },
+        "outputs": {},
+        "parameters": {
+            "$connections": {
+                "type": "Object",
+                "defaultValue": {}
+            }
+        }
+    },
+    "parameters": {
+        "$connections": {
+            "type": "Object",
+            "value": {
+                "azuread": {
+                    "id": "/subscriptions/{SUBSCRIPTION_ID}/providers/Microsoft.Web/locations/uksouth/managedApis/azuread",
+                    "connectionId": "/subscriptions/{SUBSCRIPTION_ID}/resourceGroups/{RESOURCE_GROUP_NAME}/providers/Microsoft.Web/connections/azuread",
+                    "connectionName": "azuread"
+                },
+                "arm": {
+                    "id": "/subscriptions/{SUBSCRIPTION_ID}/providers/Microsoft.Web/locations/uksouth/managedApis/arm",
+                    "connectionId": "/subscriptions/{SUBSCRIPTION_ID}/resourceGroups/{RESOURCE_GROUP_NAME}/providers/Microsoft.Web/connections/arm",
+                    "connectionName": "arm"
+                },
+                "slack": {
+                    "id": "/subscriptions/{SUBSCRIPTION_ID}/providers/Microsoft.Web/locations/uksouth/managedApis/slack",
+                    "connectionId": "/subscriptions/{SUBSCRIPTION_ID}/resourceGroups/{RESOURCE_GROUP_NAME}/providers/Microsoft.Web/connections/slack",
+                    "connectionName": "slack"
+                }
+            }
+        }
+    }
+}
